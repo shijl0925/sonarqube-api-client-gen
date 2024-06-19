@@ -1,10 +1,9 @@
 package {{.PackageName}}
 
 import (
+	"fmt"
 	"context"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 // {{.ServiceName}} {{.Description | formatDescription }}
@@ -22,23 +21,15 @@ type {{.ServiceName}} struct {
 	url string
 }
 
-
-{{- if .Deprecated }}
-// Deprecated
-{{- end}}
-func New{{.ServiceName}} (client *Client) *{{.ServiceName}}{
-	s := &{{.ServiceName}}{
-		client: client,
-		url: "{{.Path}}",
-	}
-	return s
-}
-
 {{- range $index, $element := .Actions}}
 {{ template "action" $element}}
 {{- end}}
 
 {{- define "action"}}
+{{- if .Params }}
+{{ template "request" .}}
+{{- end}}
+
 // {{ .MethodName }} {{.Description | formatDescription }}
 {{- if .Since}}
 // Since {{.Since}}
@@ -54,35 +45,21 @@ func New{{.ServiceName}} (client *Client) *{{.ServiceName}}{
 //
 // Deprecated since {{.DeprecatedSince}}
 {{- end}}
-func (s *{{.ServiceName}}) {{.MethodName}} (ctx context.Context{{- if .Params}}, request *{{.RequestTypeName}}{{- end}}) (*{{.ResponseTypeName}}, error) {
-	resp, err := s.client.invoke(ctx, {{.Post}}, s.url + "/" + "{{.Key}}", {{- if .Params}} request {{- else}} nil {{- end}})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to call {{.ServiceName}}.{{.MethodName}}")
-	}
-	return &{{.ResponseTypeName}}{
-		Response: resp,
-	}, nil
+func (s *{{.ServiceName}}) {{.MethodName}} (ctx context.Context{{- if .Params}}, opt *{{.RequestTypeName}}{{- end}}) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", s.url, "{{.Key}}")
+	return s.client.invoke(ctx, {{.Post}}, url, {{- if .Params}} opt {{- else}} nil {{- end}})
 }
-{{- if .Params }}
-{{ template "request" .}}
-{{- end}}
-
-{{ template "response" .}}
-
 {{- end}}
 
 {{- define "request"}}
 {{$post := .Post}}
 type {{.RequestTypeName}} struct {
 {{- /* see https://github.com/golang/go/issues/18221#issuecomment-394255883 */}}
-{{- range .Params}}
+{{- range .Params }}
 	// {{.Description | formatDescription }}
 	{{- if .Since | formatSince }}
 	// Since {{ .Since | formatSince }}
 	{{- end}}
-	{{- if .Required}}
-	// Required
-	{{- end }}
 	{{- if .Internal}}
 	// Internal
 	{{- end }}
@@ -99,12 +76,6 @@ type {{.RequestTypeName}} struct {
 	// Deprecated since {{.DeprecatedSince.String}}
 	{{- end }}
 	{{.ParamName}} string {{- if $post }} {{tick}}json:"{{.Key}}{{ if not .Required}},omitempty{{ end }}"{{tick}} {{- else}} {{tick}}url:"{{.Key}}{{ if not .Required}},omitempty{{ end }}"{{tick}} {{- end}}
-{{- end}}
-}
-{{- end}}
-
-{{- define "response"}}
-type {{.ResponseTypeName}} struct {
-	*http.Response
+{{ end}}
 }
 {{- end}}

@@ -10,8 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/go-querystring/query"
-
-	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -20,7 +18,7 @@ type Client struct {
 	password string
 	transport *http.Client
 {{- range .WebServices}}
-	{{.Variable}} *{{.ServiceName}}
+	{{.Getter}} *{{.ServiceName}}
 {{- end }}
 }
 
@@ -102,7 +100,7 @@ func NewClient(httpClient *http.Client, host, username, password string) *Client
 	}
 
 {{- range .WebServices}}
-	c.{{.Variable}} = New{{.ServiceName}}(c)
+	c.{{.Getter}} = &{{.ServiceName}}{client: c, url: "{{.Path}}"}
 {{- end }}
 
 	return c
@@ -125,9 +123,6 @@ func (c *Client) invoke(ctx context.Context, post bool, url string, payload inte
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse payload")
-	}
 
 	var req *http.Request
 	var body io.Reader
@@ -140,15 +135,14 @@ func (c *Client) invoke(ctx context.Context, post bool, url string, payload inte
 	req, err = http.NewRequest(method, url, body)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		return nil, err
 	}
 
 	req.Header.Set("content-type", "application/x-www-form-urlencoded")
 
     if len(c.username) != 0 && len(c.password) != 0 {
-	    req.SetBasicAuth(c.username, c.password)
+        req.SetBasicAuth(c.username, c.password)
     }
-
 	req.WithContext(ctx)
 
 	resp, err := c.transport.Do(req)
@@ -156,34 +150,7 @@ func (c *Client) invoke(ctx context.Context, post bool, url string, payload inte
 		return nil, err
 	}
 	if err := checkHttpErrors(resp); err != nil {
-		return nil, errors.Wrapf(err, "got error response (url: %s)", url)
+		return nil, err
 	}
 	return resp, nil
-}
-
-{{- range .WebServices}}
-{{- template "getter" .}}
-{{- end}}
-
-{{- define "getter"}}
-// {{.Description}}
-{{- if .Since }}
-// Since : {{.Since}}
-{{- end}}
-{{- if .Deprecated }}
-// Deprecated
-{{- end}}
-{{- if .Internal }}
-// Internal
-{{- end}}
-func (c *Client) {{.Getter}}() *{{.ServiceName}} {
-	return c.{{.Variable}}
-}
-{{- end}}
-
-// Helper function to convert string to pointer to string
-func String(v string) *string {
-	p := new(string)
-	*p = v
-	return p
 }

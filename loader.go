@@ -14,8 +14,6 @@ const (
 	defaultVersionNumber = 0
 	defaultPackageName   = "sonarqube_client"
 	serviceSuffix        = "Service"
-	requestSuffix        = "Request"
-	responseSuffix       = "Response"
 	urlPrefix            = "api/"
 	fileExt              = ".go"
 	webservicesUrl       = "/api/webservices/list"
@@ -166,11 +164,15 @@ func (a *action) MethodName() string {
 }
 
 func (a *action) RequestTypeName() string {
-	return a.ServiceName + a.MethodName() + requestSuffix
-}
+	var suffix string
 
-func (a *action) ResponseTypeName() string {
-	return a.ServiceName + a.MethodName() + responseSuffix
+	if a.Post {
+		suffix = "Input"
+	} else {
+		suffix = "Options"
+	}
+
+	return fmt.Sprintf("%s%s%s", strings.Replace(a.ServiceName, serviceSuffix, "", -1), a.MethodName(), suffix)
 }
 
 func (a *action) Deprecated() bool {
